@@ -64,6 +64,9 @@ if __name__ == '__main__':
                            help='Render a sequence of spinning images.')
     app_group.add_argument('--rsphere', action='store_true',
                            help='Render around a sphere.')
+    app_group.add_argument('--sdf_grid', action='store_true',
+                           help='Creates a uniform grid of with x samples per dimension'
+                           ' and evalulates sdf at each point, and dumps the data in ./sdf.csv')
     app_group.add_argument('--nb-poses', type=int, default=64,
                            help='Number of poses to render for sphere rendering.')
     app_group.add_argument('--cam-radius', type=float, default=4.0,
@@ -130,9 +133,9 @@ if __name__ == '__main__':
         model_matrix = torch.eye(3)
 
     if args.r360:
-        for angle in np.arange(0, 360, 2):
+        for angle in np.arange(0, 360, 10):
             rad = np.radians(angle)
-            model_matrix = torch.FloatTensor(R.from_rotvec(rad * np.array([0,1,0])).as_matrix())
+            model_matrix = torch.FloatTensor(R.from_rotvec(rad * np.array([-1./np.sqrt(3.),-1./np.sqrt(3.),-1./np.sqrt(3.)])).as_matrix())
             
             out = renderer.shade_images(f=args.camera_origin,
                                         t=args.camera_lookat,
@@ -140,15 +143,15 @@ if __name__ == '__main__':
                                         aa=not args.disable_aa,
                                         mm=model_matrix)
             
-            data = out.float().numpy().exrdict()
+            # data = out.float().numpy().exrdict()
             
             idx = int(math.floor(100 * angle))
 
-            if args.exr:
-                write_exr('{}/exr/{:06d}.exr'.format(ins_dir, idx), data)
+            # if args.exr:
+            #     write_exr('{}/exr/{:06d}.exr'.format(ins_dir, idx), data)
             
             img_out = out.image().byte().numpy()
-            Image.fromarray(img_out.rgb).save('{}/rgb/{:06d}.png'.format(ins_dir, idx), mode='RGB')
+            # Image.fromarray(img_out.rgb).save('{}/rgb/{:06d}.png'.format(ins_dir, idx), mode='RGB')
             Image.fromarray(img_out.normal).save('{}/normal/{:06d}.png'.format(ins_dir, idx), mode='RGB')
     
     elif args.rsphere:
@@ -167,32 +170,51 @@ if __name__ == '__main__':
                 write_exr('{}/exr/{:06d}.exr'.format(ins_dir, p), data)
             
             img_out = out.image().byte().numpy()
-            Image.fromarray(img_out.rgb).save('{}/rgb/{:06d}.png'.format(ins_dir, p), mode='RGB')
+            # Image.fromarray(img_out.rgb).save('{}/rgb/{:06d}.png'.format(ins_dir, p), mode='RGB')
             Image.fromarray(img_out.normal).save('{}/normal/{:06d}.png'.format(ins_dir, p), mode='RGB')
     
+    elif args.sdf_grid:
+        # Create a uniform grid on torch. 
+        # x range [-1.1, 1.1], y range [-1.1, 1.1], z range [-1.1 to 1.1]
+        K = np.linspace(-1.1, 1.1, 150)
+        grid = [[x,y,z] for x in K for y in K for z in K]
+        torch_grid = torch.tensor(np.array(grid), device='cuda:0')
+        print("shape of torch grid: ", torch_grid.size())
+        # print(torch_grid)
+        net.eval()
+        sdf = net(torch_grid)
+        print("shape of sdf grid: ", sdf.size())
+        print(sdf)
+        # Compute SDF on the torch_grid to torch_sdf
+        r = np.hstack(sdf.detach().cpu().numpy(), torch_grid.detach().cpu().numpy())
+        np.savetxt("sdf.csv", r, delimiter=",")
+        exit(1)
+
     else:
+        print("[INFO] here it is")
+        # out = renderer.shade_images(f=args.camera_origin, 
+        #                             t=args.camera_lookat, 
+        #                             fv=args.camera_fov, 
+        #                             aa=not args.disable_aa, 
+        #                             mm=model_matrix)
+        
+        # data = out.float().numpy().exrdict()
+        
+        # if args.render_2d:
+        depth = args.depth
+        print("[INFO] sdf slice")
+        # data['sdf_slice'] = renderer.sdf_slice(depth=depth)
+        renderer.sdf_slice(depth=depth)
+            # data['rgb_slice'] = renderer.rgb_slice(depth=depth)
+            # data['normal_slice'] = renderer.normal_slice(depth=depth)
+        
+        # if args.exr:
+        #     write_exr(f'{ins_dir}/out.exr', data)
 
-        out = renderer.shade_images(f=args.camera_origin, 
-                                    t=args.camera_lookat, 
-                                    fv=args.camera_fov, 
-                                    aa=not args.disable_aa, 
-                                    mm=model_matrix)
+        # img_out = out.image().byte().numpy()
         
-        data = out.float().numpy().exrdict()
-        
-        if args.render_2d:
-            depth = args.depth
-            data['sdf_slice'] = renderer.sdf_slice(depth=depth)
-            data['rgb_slice'] = renderer.rgb_slice(depth=depth)
-            data['normal_slice'] = renderer.normal_slice(depth=depth)
-        
-        if args.exr:
-            write_exr(f'{ins_dir}/out.exr', data)
-
-        img_out = out.image().byte().numpy()
-        
-        Image.fromarray(img_out.rgb).save('{}/{}_rgb.png'.format(ins_dir, name), mode='RGB')
-        Image.fromarray(img_out.depth).save('{}/{}_depth.png'.format(ins_dir, name), mode='RGB')
-        Image.fromarray(img_out.normal).save('{}/{}_normal.png'.format(ins_dir, name), mode='RGB')
-        Image.fromarray(img_out.hit).save('{}/{}_hit.png'.format(ins_dir, name), mode='L')
+        # Image.fromarray(img_out.rgb).save('{}/{}_rgb.png'.format(ins_dir, name), mode='RGB')
+        # Image.fromarray(img_out.depth).save('{}/{}_depth.png'.format(ins_dir, name), mode='RGB')
+        # Image.fromarray(img_out.normal).save('{}/{}_normal.png'.format(ins_dir, name), mode='RGB')
+        # Image.fromarray(img_out.hit).save('{}/{}_hit.png'.format(ins_dir, name), mode='L')
 

@@ -22,6 +22,7 @@
 import time
 
 import torch
+from torch._C import dtype
 import torch.nn.functional as F
 import torch.nn as nn
 
@@ -41,8 +42,26 @@ from .PsDebugger import PsDebugger
 from sol_nglod import aabb
 
 from .tracer import *
+from .geometry import CubeMarcher
 
 ### Renderer
+
+def gyroidFunc(uniformGrid):
+    """Evaluates uniform grid (N, 3) using gyroid implicit equation. Returns (N,) result."""
+    # x = uniformGrid[:, 0]
+    # print(x)
+    # y = uniformGrid[:, 1]
+    # z = uniformGrid[:, 2]
+    kCellSize = 0.014408772790049425*7.
+    # 0.125/2.  # you can change this if you want
+    t = 0.1  # the isovalue, change if you want
+    result = (torch.cos(2*3.14*uniformGrid[:, 0]/kCellSize) * torch.sin(2*3.14*uniformGrid[:, 1]/kCellSize) + \
+             torch.cos(2*3.14*uniformGrid[:, 1]/kCellSize) * torch.sin(2*3.14*uniformGrid[:, 2]/kCellSize) + \
+             torch.cos(2*3.14*uniformGrid[:, 2]/kCellSize) * torch.sin(2*3.14*uniformGrid[:, 0]/kCellSize)) - t**2
+    result = torch.tensor(result, device='cuda:0', dtype=torch.float16)
+    # print("shape of result:", result.size())             
+    # print(result)
+    return result
 
 class Renderer(nn.Module):
     """Main renderer class."""
@@ -128,7 +147,7 @@ class Renderer(nn.Module):
 
     def render(self, net, ray_o, ray_d):
         # Differentiable Renderer
-
+        self.args.perf = True
         timer = PerfTimer(activate=self.args.perf)
         if self.args.perf:
             _time = time.time()
@@ -185,7 +204,7 @@ class Renderer(nn.Module):
         ######################
         # Relative Depth
         ######################
-        rb.relative_depth = torch.clip(rb.depth, 0.0, self.clamp[1]) / self.clamp[1]
+        rb.relative_depth = torch.clamp(rb.depth, 0.0, self.clamp[1]) / self.clamp[1]
 
         ######################
         # Shading Rendering
@@ -202,9 +221,10 @@ class Renderer(nn.Module):
             psd.register_point_cloud("x", rb.x)
             psd.add_vector_quantity("x", "normal", rb.normal)
             psd.add_color_quantity("x", "rgb", rb.rgb)
-            psd.add_surface_mesh("obj", "/home/ttakikawa/datasets/pineapple_mesh/models/pineapple.obj")
+            psd.add_surface_mesh("obj", "/home/hardik/dl_exp/nglod/sdf-net/_results/models/p.obj")
             psd.show()
-        #_vis()
+
+        # _vis()
 
         ######################
         # Ambient Occlusion
@@ -263,11 +283,44 @@ class Renderer(nn.Module):
     
     def sdf_slice(self, dim=0, depth=0):
         pts = normalized_slice(self.width, self.height, dim=dim, depth=depth, device=self.device)
-
+        start = time.time()
+        Kx = np.linspace(-0.5, 0.5, 150)
+        Ky = np.linspace(-0.5, 0.5, 150)
+        Kz = np.linspace(-0.1, 1.1, 150)
+        grid = [[x,y,z] for x in Kx for y in Ky for z in Kz]
+        torch_grid = torch.tensor(np.array(grid), device='cuda:0', dtype=torch.float32)
+        print("shape of torch grid: ", torch_grid.size())
+        # print(torch_grid)
+        # print(pts.type)
         with torch.no_grad():
             d = self.sdf_net(pts.reshape(-1,3))
-        d = d.reshape(self.width, self.height, 1)
+            sdf = self.sdf_net(torch_grid.reshape(-1, 3))
 
+        print("Time Elapsed to evalulate sdf for 150**3 points :{:.4f}".format(time.time() - start))
+        gyroid = gyroidFunc(torch_grid.reshape(-1, 3))
+        gyroid = gyroid.reshape(-1, 1)
+        print("torch gyroid info:", gyroid.shape)
+        np_sdf = sdf.detach().cpu().numpy()
+        np_gyroid = gyroid.detach().cpu().numpy()
+        np_grid = torch_grid.detach().cpu().numpy()
+        del sdf, gyroid, torch_grid
+        torch.cuda.empty_cache()        
+        print("np_sdf info:", np_sdf.shape)
+        np_gyroid = np.reshape(np_gyroid, (-1, 1))
+        print("np_gyroid info:", np_gyroid.shape)
+        d = np.maximum(np_sdf, np_gyroid)
+        print("Time Elapsed to get everything read :{:.4f}".format(time.time() - start))
+        # print("Size of sdf: ", sdf.size())
+        # print(sdf.detach().cpu().numpy())
+        # r = np.hstack((torch_grid.detach().cpu().numpy(), sdf.detach().cpu().numpy()))
+        # np.savetxt("sdf.csv", r, delimiter=",")
+        cubeMarcher = CubeMarcher()
+        cubeMarcher.march(np_grid, d)
+        marchedMesh = cubeMarcher.getMesh()
+        marchedMesh.save("./marched.obj")
+        exit(1)
+        d = d.reshape(self.width, self.height, 1)
+        # print(d)
         d = d.squeeze().cpu().numpy()
         dpred = d
         d = np.clip((d + 1.0) / 2.0, 0.0, 1.0)

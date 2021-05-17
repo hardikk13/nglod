@@ -33,6 +33,23 @@ from ..PsDebugger import PsDebugger
 
 from sol_nglod import aabb
 
+def gyroidFunc(uniformGrid):
+    """Evaluates uniform grid (N, 3) using gyroid implicit equation. Returns (N,) result."""
+    # x = uniformGrid[:, 0]
+    # print(x)
+    # y = uniformGrid[:, 1]
+    # z = uniformGrid[:, 2]
+    kCellSize = 0.014408772790049425*3
+    # 0.125/2.  # you can change this if you want
+    t = 0.1  # the isovalue, change if you want
+    result = (torch.cos(2*3.14*uniformGrid[:, 0]/kCellSize) * torch.sin(2*3.14*uniformGrid[:, 1]/kCellSize) + \
+             torch.cos(2*3.14*uniformGrid[:, 1]/kCellSize) * torch.sin(2*3.14*uniformGrid[:, 2]/kCellSize) + \
+             torch.cos(2*3.14*uniformGrid[:, 2]/kCellSize) * torch.sin(2*3.14*uniformGrid[:, 0]/kCellSize)) - t**2
+    result = torch.tensor(result, device='cuda:0', dtype=torch.float16)
+    # print("shape of result:", result.size())             
+    # print(result)
+    return result
+
 class SphereTracer(nn.Module):
     
     def __init__(self, 
@@ -85,6 +102,8 @@ class SphereTracer(nn.Module):
 
         # Position in model space
         x = torch.addcmul(ray_o, ray_d, t)
+        gyroidEval = gyroidFunc(x)
+        # print(gyroidEval)
 
         cond = torch.ones_like(t).bool()[:,0]
         #x, t, cond = aabb(ray_o, ray_d)
@@ -98,8 +117,15 @@ class SphereTracer(nn.Module):
         # gradients will propagate only to these locations. 
         with torch.no_grad():
 
+            # d = gyroidEval
             d = net(x)
-            
+            # torch.max(net(x), gyroidEval)
+            # net(x)
+            # print("Shape of x", x.size())
+            # print("Shape of d", d.size())
+            # print(d)
+            # 
+
             dprev = d.clone()
 
             # If cond is TRUE, then the corresponding ray has not hit yet.

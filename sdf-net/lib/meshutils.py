@@ -30,6 +30,8 @@ import tinyobjloader
 import torch
 import mesh2sdf as m2s
 
+# import mesh2sdf as m2s
+
 # Utilities for Mesh Processing
 
 def load_obj(fname: str):

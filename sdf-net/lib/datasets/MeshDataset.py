@@ -24,6 +24,7 @@ import os
 import torch
 from torch.utils.data import Dataset
 
+# from pysdfgen import mesh2sdf
 import mesh2sdf
 
 from ..meshutils import trim_obj_to_file, load_obj, convert_to_nvc
@@ -79,6 +80,7 @@ class MeshDataset(Dataset):
             nrm = nrm.cpu()
         else:
             pts = point_sample(self.mesh, self.sample_mode, self.num_samples)
+        print("[INFO], # of samples:", pts.size())
         d = self.evaluate_distance(pts.cuda(), self.mesh.cuda()).unsqueeze(1)
         ids = torch.zeros_like(d)
         d = d.cpu()

@@ -1,0 +1,6 @@
+setup.py
+pyigl.egg-info/PKG-INFO
+pyigl.egg-info/SOURCES.txt
+pyigl.egg-info/dependency_links.txt
+pyigl.egg-info/not-zip-safe
+pyigl.egg-info/top_level.txt

@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/CMakeFiles/glfw-download"
+		},
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/CMakeFiles/glfw-download.rule"
+		},
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/CMakeFiles/glfw-download-complete.rule"
+		},
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/glfw-download-prefix/src/glfw-download-stamp/glfw-download-install.rule"
+		},
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/glfw-download-prefix/src/glfw-download-stamp/glfw-download-mkdir.rule"
+		},
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/glfw-download-prefix/src/glfw-download-stamp/glfw-download-download.rule"
+		},
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/glfw-download-prefix/src/glfw-download-stamp/glfw-download-update.rule"
+		},
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/glfw-download-prefix/src/glfw-download-stamp/glfw-download-patch.rule"
+		},
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/glfw-download-prefix/src/glfw-download-stamp/glfw-download-configure.rule"
+		},
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/glfw-download-prefix/src/glfw-download-stamp/glfw-download-build.rule"
+		},
+		{
+			"file" : "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/glfw/glfw-download-prefix/src/glfw-download-stamp/glfw-download-test.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"glfw-download"
+		],
+		"name" : "glfw-download"
+	}
+}

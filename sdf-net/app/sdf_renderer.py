@@ -49,6 +49,33 @@ def write_exr(path, data):
                                'view': ['X','Y','Z']},
                 precision=pyexr.HALF)
 
+class GyroidLattice(nn.Module):
+    """Gyroid lattice for the given implicit neural geometry."""
+    def __init__(self, sdf_net):
+        """Constructor.
+        Args:
+            sdf_net (nn.Module): SDF network
+        """
+        super().__init__()
+        self.sdf_net = sdf_net    
+    
+    def forward(self, x):
+        """Evaluates uniform grid (N, 3) using gyroid implicit equation. Returns (N,) result."""
+         # x = uniformGrid[:, 0]
+        # print(x)
+        # y = uniformGrid[:, 1]
+        # z = uniformGrid[:, 2]
+        kCellSize = 0.014408772790049425*7.    
+        t = 0.5  # the isovalue, change if you want
+        gyroid = (torch.cos(2*3.14*x[:, 0]/kCellSize) * torch.sin(2*3.14*x[:, 1]/kCellSize) + \
+                  torch.cos(2*3.14*x[:, 1]/kCellSize) * torch.sin(2*3.14*x[:, 2]/kCellSize) + \
+                  torch.cos(2*3.14*x[:, 2]/kCellSize) * torch.sin(2*3.14*x[:, 0]/kCellSize)) - t**2
+        gyroid = torch.tensor(gyroid, device='cuda:0', dtype=torch.float16)
+        gyroid = gyroid.reshape(-1, 1)
+        # return gyroid
+        return torch.max(gyroid, self.sdf_net(x))
+        
+
 if __name__ == '__main__':
 
     # Parse
@@ -91,12 +118,15 @@ if __name__ == '__main__':
     else:
         assert False and "No network weights specified!"
 
-    net = globals()[args.net](args)
+    org_net = globals()[args.net](args)
     if args.jit:
-        net = torch.jit.script(net)
+        org_net = torch.jit.script(org_net)
     
-    net.load_state_dict(torch.load(args.pretrained))
+    org_net.load_state_dict(torch.load(args.pretrained))
 
+    org_net.to(device)
+    org_net.eval()
+    net = GyroidLattice(org_net)
     net.to(device)
     net.eval()
     
@@ -151,8 +181,8 @@ if __name__ == '__main__':
             #     write_exr('{}/exr/{:06d}.exr'.format(ins_dir, idx), data)
             
             img_out = out.image().byte().numpy()
-            # Image.fromarray(img_out.rgb).save('{}/rgb/{:06d}.png'.format(ins_dir, idx), mode='RGB')
-            Image.fromarray(img_out.normal).save('{}/normal/{:06d}.png'.format(ins_dir, idx), mode='RGB')
+            Image.fromarray(img_out.rgb).save('{}/rgb/{:06d}.png'.format(ins_dir, idx), mode='RGB')
+            # Image.fromarray(img_out.normal).save('{}/normal/{:06d}.png'.format(ins_dir, idx), mode='RGB')
     
     elif args.rsphere:
         views = sample_fib_sphere(args.nb_poses)
@@ -205,6 +235,12 @@ if __name__ == '__main__':
         print("[INFO] sdf slice")
         # data['sdf_slice'] = renderer.sdf_slice(depth=depth)
         renderer.sdf_slice(depth=depth)
+        # Kx = np.linspace(-1, 1, 150)
+        # Ky = np.linspace(-1, 1, 150)
+        # Kz = np.linspace(-1, 1, 150)
+        # grid = [[x,y,z] for x in Kx for y in Ky for z in Kz]
+        # torch_grid = torch.tensor(np.array(grid), device='cuda:0', dtype=torch.float32)
+            
             # data['rgb_slice'] = renderer.rgb_slice(depth=depth)
             # data['normal_slice'] = renderer.normal_slice(depth=depth)
         

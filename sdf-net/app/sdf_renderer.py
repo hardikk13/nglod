@@ -41,6 +41,7 @@ from lib.renderer import Renderer
 from lib.models import *
 from lib.options import parse_options
 from lib.geoutils import sample_unif_sphere, sample_fib_sphere, normalized_slice
+from lib.geometry import CubeMarcher
 
 def write_exr(path, data):
     pyexr.write(path, data,
@@ -65,13 +66,14 @@ class GyroidLattice(nn.Module):
         # print(x)
         # y = uniformGrid[:, 1]
         # z = uniformGrid[:, 2]
-        kCellSize = 0.014408772790049425*7.    
+        kCellSize = 0.014408772790049425*3.    
         t = 0.5  # the isovalue, change if you want
         gyroid = (torch.cos(2*3.14*x[:, 0]/kCellSize) * torch.sin(2*3.14*x[:, 1]/kCellSize) + \
                   torch.cos(2*3.14*x[:, 1]/kCellSize) * torch.sin(2*3.14*x[:, 2]/kCellSize) + \
                   torch.cos(2*3.14*x[:, 2]/kCellSize) * torch.sin(2*3.14*x[:, 0]/kCellSize)) - t**2
-        gyroid = torch.tensor(gyroid, device='cuda:0', dtype=torch.float16)
+        gyroid = torch.tensor(gyroid, device='cuda:0', dtype=torch.float32)
         gyroid = gyroid.reshape(-1, 1)
+        # return self.sdf_net(x)
         # return gyroid
         return torch.max(gyroid, self.sdf_net(x))
         
@@ -231,16 +233,25 @@ if __name__ == '__main__':
         # data = out.float().numpy().exrdict()
         
         # if args.render_2d:
-        depth = args.depth
+        # depth = args.depth
         print("[INFO] sdf slice")
         # data['sdf_slice'] = renderer.sdf_slice(depth=depth)
-        renderer.sdf_slice(depth=depth)
-        # Kx = np.linspace(-1, 1, 150)
-        # Ky = np.linspace(-1, 1, 150)
-        # Kz = np.linspace(-1, 1, 150)
-        # grid = [[x,y,z] for x in Kx for y in Ky for z in Kz]
-        # torch_grid = torch.tensor(np.array(grid), device='cuda:0', dtype=torch.float32)
-            
+        # renderer.sdf_slice(depth=depth)
+        Kx = np.linspace(-1.,1., 150)
+        Ky = np.linspace(-0.3, 0.5, 150)
+        Kz = np.linspace(-0.3, 0.8, 150)
+        grid = [[x,y,z] for x in Kx for y in Ky for z in Kz]
+        torch_grid = torch.tensor(np.array(grid), device='cuda:0', dtype=torch.float32)
+        with torch.no_grad():            
+            sdf = net(torch_grid.reshape(-1, 3))
+
+        np_sdf = sdf.detach().cpu().numpy()
+        np_grid = torch_grid.detach().cpu().numpy()
+        del sdf, torch_grid  
+        cubeMarcher = CubeMarcher()
+        cubeMarcher.march(np_grid, np_sdf)
+        marchedMesh = cubeMarcher.getMesh()
+        marchedMesh.save("./marched_gyroid.obj")
             # data['rgb_slice'] = renderer.rgb_slice(depth=depth)
             # data['normal_slice'] = renderer.normal_slice(depth=depth)
         
